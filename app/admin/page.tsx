@@ -581,7 +581,7 @@ export default function AdminPage() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        
+
         {/* Metric Cards Summary */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 shadow-xs">
@@ -631,11 +631,10 @@ export default function AdminPage() {
         <div className="flex border-b border-slate-800 gap-2 overflow-x-auto">
           <button
             onClick={() => setActiveTab("orders")}
-            className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "orders"
-                ? "border-orange-500 text-orange-400 bg-orange-500/5"
-                : "border-transparent text-slate-400 hover:text-slate-200"
-            }`}
+            className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === "orders"
+              ? "border-orange-500 text-orange-400 bg-orange-500/5"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
           >
             <ShoppingBag className="w-4 h-4" />
             <span>Gestão de Pedidos</span>
@@ -648,11 +647,10 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab("products")}
-            className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "products"
-                ? "border-orange-500 text-orange-400 bg-orange-500/5"
-                : "border-transparent text-slate-400 hover:text-slate-200"
-            }`}
+            className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === "products"
+              ? "border-orange-500 text-orange-400 bg-orange-500/5"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
           >
             <UtensilsCrossed className="w-4 h-4" />
             <span>Itens do Cardápio ({products.length})</span>
@@ -660,11 +658,10 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab("categories")}
-            className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "categories"
-                ? "border-orange-500 text-orange-400 bg-orange-500/5"
-                : "border-transparent text-slate-400 hover:text-slate-200"
-            }`}
+            className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === "categories"
+              ? "border-orange-500 text-orange-400 bg-orange-500/5"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
           >
             <FolderTree className="w-4 h-4" />
             <span>Categorias (Pratos e Bebidas)</span>
@@ -672,11 +669,10 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab("settings")}
-            className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "settings"
-                ? "border-orange-500 text-orange-400 bg-orange-500/5"
-                : "border-transparent text-slate-400 hover:text-slate-200"
-            }`}
+            className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === "settings"
+              ? "border-orange-500 text-orange-400 bg-orange-500/5"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
           >
             <RotateCcw className="w-4 h-4" />
             <span>Restaurar Dados</span>
@@ -702,11 +698,10 @@ export default function AdminPage() {
                   <button
                     key={st.id}
                     onClick={() => setOrderStatusFilter(st.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                      orderStatusFilter === st.id
-                        ? "bg-orange-600 text-white shadow-md shadow-orange-600/20"
-                        : "bg-slate-900 text-slate-400 hover:bg-slate-850 border border-slate-800"
-                    }`}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${orderStatusFilter === st.id
+                      ? "bg-orange-600 text-white shadow-md shadow-orange-600/20"
+                      : "bg-slate-900 text-slate-400 hover:bg-slate-850 border border-slate-800"
+                      }`}
                   >
                     <span>{st.label}</span>
                     <span className="ml-1.5 opacity-70 text-[10px]">({st.count})</span>
@@ -880,7 +875,11 @@ export default function AdminPage() {
                                 <span>Aceitar</span>
                               </button>
                               <button
-                                onClick={() => handleChangeOrderStatus(ord.id, "cancelado")}
+                                onClick={() => {
+                                  if (confirm(`Tem certeza que realmente deseja recusar e cancelar o pedido #${ord.id.slice(-6)}?`)) {
+                                    handleChangeOrderStatus(ord.id, "cancelado");
+                                  }
+                                }}
                                 className="py-1.5 px-2 text-slate-400 hover:text-red-400 text-xs font-medium transition-colors cursor-pointer"
                               >
                                 Recusar
@@ -959,32 +958,29 @@ export default function AdminPage() {
               <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => setCategoryFilter("all")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    categoryFilter === "all"
-                      ? "bg-orange-600 text-white shadow-md shadow-orange-600/20"
-                      : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
-                  }`}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${categoryFilter === "all"
+                    ? "bg-orange-600 text-white shadow-md shadow-orange-600/20"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
+                    }`}
                 >
                   Todos ({products.length})
                 </button>
                 <button
                   onClick={() => setCategoryFilter("pratos")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    categoryFilter === "pratos"
-                      ? "bg-orange-600 text-white shadow-md shadow-orange-600/20"
-                      : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
-                  }`}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${categoryFilter === "pratos"
+                    ? "bg-orange-600 text-white shadow-md shadow-orange-600/20"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
+                    }`}
                 >
                   <span>🍲</span>
                   <span>Pratos</span>
                 </button>
                 <button
                   onClick={() => setCategoryFilter("bebidas")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    categoryFilter === "bebidas"
-                      ? "bg-orange-600 text-white shadow-md shadow-orange-600/20"
-                      : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
-                  }`}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${categoryFilter === "bebidas"
+                    ? "bg-orange-600 text-white shadow-md shadow-orange-600/20"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
+                    }`}
                 >
                   <span>🥤</span>
                   <span>Bebidas</span>
@@ -1365,11 +1361,10 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() => setFormCategory("pratos")}
-                    className={`py-2 px-3 rounded-xl text-xs font-semibold border flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                      formCategory === "pratos"
-                        ? "bg-orange-600 text-white border-orange-600"
-                        : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-850"
-                    }`}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border flex items-center justify-center gap-2 transition-all cursor-pointer ${formCategory === "pratos"
+                      ? "bg-orange-600 text-white border-orange-600"
+                      : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-850"
+                      }`}
                   >
                     <span>🍲</span>
                     <span>Pratos</span>
@@ -1377,11 +1372,10 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() => setFormCategory("bebidas")}
-                    className={`py-2 px-3 rounded-xl text-xs font-semibold border flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                      formCategory === "bebidas"
-                        ? "bg-orange-600 text-white border-orange-600"
-                        : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-850"
-                    }`}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border flex items-center justify-center gap-2 transition-all cursor-pointer ${formCategory === "bebidas"
+                      ? "bg-orange-600 text-white border-orange-600"
+                      : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-850"
+                      }`}
                   >
                     <span>🥤</span>
                     <span>Bebidas</span>
@@ -1398,9 +1392,8 @@ export default function AdminPage() {
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="Ex: Feijão Tropeiro Tradicional"
-                  className={`w-full px-3 py-2 bg-slate-900 border rounded-xl text-xs text-white focus:outline-none focus:border-orange-500 ${
-                    formErrors.name ? "border-red-500" : "border-slate-800"
-                  }`}
+                  className={`w-full px-3 py-2 bg-slate-900 border rounded-xl text-xs text-white focus:outline-none focus:border-orange-500 ${formErrors.name ? "border-red-500" : "border-slate-800"
+                    }`}
                 />
                 {formErrors.name && (
                   <p className="text-[10px] text-red-400 mt-1">{formErrors.name}</p>
@@ -1417,9 +1410,8 @@ export default function AdminPage() {
                     value={formPrice}
                     onChange={(e) => setFormPrice(e.target.value)}
                     placeholder="Ex: 38.90"
-                    className={`w-full px-3 py-2 bg-slate-900 border rounded-xl text-xs text-white focus:outline-none focus:border-orange-500 ${
-                      formErrors.price ? "border-red-500" : "border-slate-800"
-                    }`}
+                    className={`w-full px-3 py-2 bg-slate-900 border rounded-xl text-xs text-white focus:outline-none focus:border-orange-500 ${formErrors.price ? "border-red-500" : "border-slate-800"
+                      }`}
                   />
                   {formErrors.price && (
                     <p className="text-[10px] text-red-400 mt-1">{formErrors.price}</p>
@@ -1449,9 +1441,8 @@ export default function AdminPage() {
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   placeholder="Descreva os ingredientes, acompanhamentos e sabor..."
-                  className={`w-full px-3 py-2 bg-slate-900 border rounded-xl text-xs text-white focus:outline-none focus:border-orange-500 ${
-                    formErrors.description ? "border-red-500" : "border-slate-800"
-                  }`}
+                  className={`w-full px-3 py-2 bg-slate-900 border rounded-xl text-xs text-white focus:outline-none focus:border-orange-500 ${formErrors.description ? "border-red-500" : "border-slate-800"
+                    }`}
                 />
                 {formErrors.description && (
                   <p className="text-[10px] text-red-400 mt-1">{formErrors.description}</p>
@@ -1467,9 +1458,8 @@ export default function AdminPage() {
                   value={formImage}
                   onChange={(e) => setFormImage(e.target.value)}
                   placeholder="https://images.unsplash.com/..."
-                  className={`w-full px-3 py-2 bg-slate-900 border rounded-xl text-xs text-white focus:outline-none focus:border-orange-500 ${
-                    formErrors.image ? "border-red-500" : "border-slate-800"
-                  }`}
+                  className={`w-full px-3 py-2 bg-slate-900 border rounded-xl text-xs text-white focus:outline-none focus:border-orange-500 ${formErrors.image ? "border-red-500" : "border-slate-800"
+                    }`}
                 />
                 {formImage && (
                   <div className="mt-2 relative w-full h-28 rounded-xl overflow-hidden border border-slate-800">
@@ -1503,7 +1493,7 @@ export default function AdminPage() {
                 <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                   Destaques e Selos
                 </span>
-                
+
                 <label className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
                   <input
                     type="checkbox"
