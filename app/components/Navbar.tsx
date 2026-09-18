@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Search, ShoppingBag, MapPin, ChevronDown, UtensilsCrossed, X, ChefHat } from "lucide-react";
 import { Address } from "../types";
 
@@ -29,6 +29,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   hasActiveOrder = false,
   onOpenMyOrders,
 }) => {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-xs transition-all">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -36,13 +42,13 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Logo Brand */}
           <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-            <a href="#" className="flex items-center gap-2 group select-none min-w-0">
+            <a href="/" className="flex items-center gap-2 group select-none min-w-0">
               <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-500 flex items-center justify-center text-white shadow-md shadow-orange-500/30 group-hover:scale-105 transition-transform duration-200 shrink-0">
                 <UtensilsCrossed className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-base sm:text-2xl font-black tracking-tight text-slate-900 leading-none truncate">
-                  Manga<span className="text-orange-600">Com Pimenta</span>
+                  {process.env.NEXT_PUBLIC_NOME}<span className="text-orange-600"> {process.env.NEXT_PUBLIC_SOBRENOME}</span>
                 </span>
                 <span className="text-[9px] sm:text-[11px] font-semibold tracking-wider text-slate-400 uppercase mt-0.5 hidden xs:block">
                   Delivery Rápido
@@ -124,14 +130,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <div className="relative">
                 <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5" />
-                {cartCount > 0 && (
+                {isMounted && cartCount > 0 && (
                   <span className="absolute -top-2 -right-2.5 w-4 h-4 sm:w-5 sm:h-5 bg-amber-400 text-slate-900 font-black text-[10px] sm:text-xs rounded-full flex items-center justify-center shadow-xs animate-bounce">
                     {cartCount}
                   </span>
                 )}
               </div>
               <span className="hidden sm:inline text-xs sm:text-sm font-semibold">
-                {cartCount === 0 ? "Sacola" : `R$ ${cartSubtotal.toFixed(2).replace(".", ",")}`}
+                {!isMounted || cartCount === 0 ? "Sacola" : `R$ ${cartSubtotal.toFixed(2).replace(".", ",")}`}
               </span>
             </button>
           </div>

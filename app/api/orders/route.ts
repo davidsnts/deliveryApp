@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { initDb } from "@/app/lib/db";
+import { getStoreStatus } from "@/app/lib/storeStatus";
 import { Order, OrderStatus } from "@/app/types";
 
 function rowToOrder(row: any): Order {
@@ -53,6 +54,14 @@ export async function POST(request: Request) {
 
     if (!data.id || !data.customer?.name || !data.customer?.phone || !data.items || data.items.length === 0) {
       return NextResponse.json({ error: "Dados do pedido incompletos" }, { status: 400 });
+    }
+
+    const storeStatus = await getStoreStatus();
+    if (!storeStatus.isOpen) {
+      return NextResponse.json(
+        { error: storeStatus.message || "A loja está fechada e não está aceitando pedidos." },
+        { status: 403 }
+      );
     }
 
     const db = await initDb();

@@ -2,7 +2,7 @@ export interface Category {
   id: string;
   name: string;
   icon: string;
-  count: number;
+  count?: number;
 }
 
 export interface Product {
@@ -51,6 +51,11 @@ export interface Address {
   rua: string;
   numero: string;
   bairro: string;
+  complemento?: string;
+  cep?: string;
+  lat?: number;
+  lng?: number;
+  distanciaKm?: number;
   isDefault?: boolean;
 }
 
@@ -89,3 +94,32 @@ export interface Order {
   deviceId?: string;
   notes?: string;
 }
+
+export interface DeliverySettings {
+  id: string;
+  raioMaximoKm: number;
+  taxaBase: number;
+  kmBase: number;
+  valorKmAte5Km: number;
+  valorKmAte10Km: number;
+  updatedAt?: string;
+  manualOverride?: "open" | "closed" | null; // null = segue horário automático
+}
+
+/** Uma linha de horário para um dia da semana (0=Dom … 6=Sáb) */
+export interface StoreHours {
+  dayOfWeek: number;
+  isOpen: boolean;
+  openTime: string;  // "HH:MM"
+  closeTime: string; // "HH:MM"
+}
+
+/** Resposta do endpoint /api/store-status */
+export interface StoreStatus {
+  isOpen: boolean;
+  reason: "schedule" | "manual_open" | "manual_closed" | "no_schedule";
+  message: string;
+  nextOpen?: string; // ex: "Segunda às 11:00"
+  manualOverride?: "open" | "closed" | null;
+}
+

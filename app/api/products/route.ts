@@ -64,7 +64,7 @@ export async function POST(request: Request) {
         data.image?.trim() || "",
         data.category,
         data.restaurantId || "rest-1",
-        data.restaurantName || "Manga Com Pimenta",
+        data.restaurantName || `${process.env.NEXT_PUBLIC_NOME} ${process.env.NEXT_PUBLIC_SORENOME}`,
         data.rating || 5.0,
         data.reviewsCount || 1,
         data.deliveryTime || "30-40 min",

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import 'leaflet/dist/leaflet.css';
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Manga Com Pimenta | Seu Delivery Rápido e Gostoso",
+  title: `${process.env.NEXT_PUBLIC_NOME} ${process.env.NEXT_PUBLIC_SOBRENOME} | Seu Delivery Rápido`,
   description: "Preparamos nossas refeições com carinho, entrega rápida e muito sabor.",
 };
 

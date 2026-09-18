@@ -46,7 +46,7 @@ export const Footer: React.FC = () => {
                 <UtensilsCrossed className="w-4 h-4" />
               </div>
               <span className="text-lg font-black tracking-tight text-white">
-                Manga<span className="text-orange-500">Com Pimenta</span>
+                {process.env.NEXT_PUBLIC_NOME}<span className="text-orange-500"> {process.env.NEXT_PUBLIC_SOBRENOME} </span>
               </span>
             </div>
             <p className="text-slate-400 leading-relaxed text-[11px] max-w-sm">
@@ -68,7 +68,7 @@ export const Footer: React.FC = () => {
               <span className="font-semibold text-white">Juiz de Fora - MG</span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Orgulho em servir o autêntico sabor da comida mineira com muito carinho e tradição.
+              Orgulho em servir você!
             </p>
           </div>
 
@@ -96,7 +96,7 @@ export const Footer: React.FC = () => {
       <div className="border-t border-slate-800/80 py-4 bg-slate-950/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
           <span>
-            &copy; {new Date().getFullYear()} Manga com Pimenta Ltda. Todos os direitos reservados.
+            &copy; {new Date().getFullYear()} - Todos os direitos reservados.
           </span>
 
           <div className="flex items-center gap-4">

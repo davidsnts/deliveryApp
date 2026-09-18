@@ -20,11 +20,13 @@ import {
   Banknote,
   Copy,
   Check,
+  AlertCircle,
 } from "lucide-react";
-import { CartItem, Address, Order } from "../types";
+import { CartItem, Address, Order, StoreStatus } from "../types";
 import { getCustomerProfile, saveCustomerProfile, getDeviceId } from "../lib/storage";
-import { createOrder } from "../lib/api";
+import { createOrder, fetchStoreStatus } from "../lib/api";
 import { gerarPixEstatico } from "../lib/gerarPix";
+import { calcularValorFrete, RAIO_MAXIMO_KM } from "../lib/frete";
 
 interface PixOptions {
   chave: string;
@@ -75,6 +77,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [orderNotes, setOrderNotes] = useState("");
   const [copiedPix, setCopiedPix] = useState(false);
   const [completedOrderTotal, setCompletedOrderTotal] = useState<number>(0);
+  const [storeStatus, setStoreStatus] = useState<StoreStatus | null>(null);
+  const [checkoutError, setCheckoutError] = useState("");
 
   // Guarda os itens e o payload Pix do pedido concluído
   const [completedItems, setCompletedItems] = useState<CartItem[]>([]);
@@ -90,6 +94,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       const saved = getCustomerProfile();
       if (saved.name) setCustomerName(saved.name);
       if (saved.phone) setCustomerPhone(saved.phone);
+      setCheckoutError("");
+      fetchStoreStatus().then(setStoreStatus).catch(console.error);
     }
   }, [isOpen]);
 
@@ -109,15 +115,27 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   const subtotal = items.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
 
-  // Delivery fee calculation
+  // Delivery fee calculation via OpenStreetMap & 10km radius
   const hasOnlyFreeDelivery = items.length > 0 && items.every((i) => i.product.freeDelivery);
-  const deliveryFee = items.length === 0 ? 0 : hasOnlyFreeDelivery ? 0 : Number(process.env.NEXT_PUBLIC_TAXA_ENTREGA || 0);
+  const isOutOfDeliveryRadius = Boolean(
+    currentAddress?.distanciaKm !== undefined && currentAddress.distanciaKm > RAIO_MAXIMO_KM
+  );
+
+  let calculatedFee = Number(process.env.NEXT_PUBLIC_TAXA_ENTREGA || 5.0);
+  if (currentAddress?.distanciaKm !== undefined) {
+    const resFrete = calcularValorFrete(currentAddress.distanciaKm);
+    calculatedFee = resFrete.valor;
+  }
+
+  const deliveryFee = items.length === 0 ? 0 : hasOnlyFreeDelivery ? 0 : calculatedFee;
 
   // Coupon discount calculation
   let discountAmount = 0;
   if (appliedCoupon && VALID_COUPONS[appliedCoupon]) {
     const couponInfo = VALID_COUPONS[appliedCoupon];
-    if (couponInfo.type === "fixed") {
+    if (appliedCoupon === "FRETELIVRE") {
+      discountAmount = deliveryFee;
+    } else if (couponInfo.type === "fixed") {
       discountAmount = Math.min(couponInfo.discount, subtotal);
     } else if (couponInfo.type === "percent") {
       discountAmount = subtotal * couponInfo.discount;
@@ -230,9 +248,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       message += `📝 *Observações:* ${orderNotes.trim()}\n\n`;
     }
 
+    const distInfo = currentAddress?.distanciaKm ? ` (${currentAddress.distanciaKm} km via OpenStreetMap)` : "";
+    const taxaTexto = deliveryFee === 0 ? "Grátis" : `R$ ${deliveryFee.toFixed(2).replace(".", ",")}${distInfo}`;
+
     message +=
       `💳 *Forma de Pagamento:* ${paymentMethod}\n` +
-      // `*Taxa de Entrega:* Grátis\n` +
+      `🛵 *Taxa de Entrega:* ${taxaTexto}\n` +
       `💰 *TOTAL:* R$ ${(completedOrderTotal > 0 ? completedOrderTotal : finalTotal).toFixed(2).replace(".", ",")}\n\n`;
 
     if (paymentMethod === "PIX" && pixCode) {
@@ -252,7 +273,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     return `https://wa.me/${phone}?text=${text}`;
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     const errors: { name?: string; phone?: string } = {};
     if (!customerName.trim()) {
       errors.name = "Informe seu nome para a entrega";
@@ -272,55 +293,73 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       return;
     }
 
+    if (isOutOfDeliveryRadius) {
+      alert(
+        `Infelizmente o endereço selecionado está a ${currentAddress.distanciaKm} km, fora do nosso raio de entrega de até ${RAIO_MAXIMO_KM} km.`
+      );
+      onOpenAddressModal();
+      return;
+    }
+
     saveCustomerProfile({ name: customerName.trim(), phone: customerPhone.trim() });
-
+    setCheckoutError("");
     setIsCheckingOut(true);
-    const generatedId = `PED-${Math.floor(100000 + Math.random() * 900000)}`;
-    const devId = getDeviceId();
 
-    // Gera o código Pix definitivo para a comanda
-    const generatedPixPayload =
-      paymentMethod === "PIX"
-        ? gerarPixEstatico({
-          chave: process.env.NEXT_PUBLIC_PIX_CHAVE!,
-          nome: process.env.NEXT_PUBLIC_PIX_NOME!,
-          cidade: process.env.NEXT_PUBLIC_PIX_CIDADE!,
-          valor: finalTotal,
-          txid: generatedId.replace(/[^a-zA-Z0-9]/g, ""),
-        })
-        : "";
+    try {
+      const latestStatus = await fetchStoreStatus();
+      setStoreStatus(latestStatus);
+      if (!latestStatus.isOpen) {
+        setCheckoutError(latestStatus.message || "A loja está fechada e não está aceitando pedidos.");
+        return;
+      }
 
-    setCompletedOrderTotal(finalTotal);
-    setCompletedItems([...items]);
-    setCompletedPixPayload(generatedPixPayload);
+      const generatedId = `PED-${Math.floor(100000 + Math.random() * 900000)}`;
+      const devId = getDeviceId();
 
-    const newOrder: Order = {
-      id: generatedId,
-      createdAt: new Date().toISOString(),
-      customer: { name: customerName.trim(), phone: customerPhone.trim() },
-      deliveryAddress: currentAddress,
-      items: [...items],
-      subtotal,
-      deliveryFee,
-      discount: discountAmount,
-      total: finalTotal,
-      paymentMethod,
-      status: "pendente",
-      deviceId: devId,
-      notes: orderNotes.trim() || undefined,
-    };
+      const generatedPixPayload =
+        paymentMethod === "PIX"
+          ? gerarPixEstatico({
+            chave: process.env.NEXT_PUBLIC_PIX_CHAVE!,
+            nome: process.env.NEXT_PUBLIC_PIX_NOME!,
+            cidade: process.env.NEXT_PUBLIC_PIX_CIDADE!,
+            valor: finalTotal,
+            txid: generatedId.replace(/[^a-zA-Z0-9]/g, ""),
+          })
+          : "";
 
-    createOrder(newOrder)
-      .catch((err) => console.error("Erro ao registrar no banco:", err))
-      .finally(() => {
-        window.dispatchEvent(new Event("delivery_orders_updated"));
-        setOrderId(generatedId);
-        setIsCheckingOut(false);
-        setOrderCompleted(true);
+      const newOrder: Order = {
+        id: generatedId,
+        createdAt: new Date().toISOString(),
+        customer: { name: customerName.trim(), phone: customerPhone.trim() },
+        deliveryAddress: currentAddress,
+        items: [...items],
+        subtotal,
+        deliveryFee,
+        discount: discountAmount,
+        total: finalTotal,
+        paymentMethod,
+        status: "pendente",
+        deviceId: devId,
+        notes: orderNotes.trim() || undefined,
+      };
 
-        onClearCart();
-        onRemoveCoupon();
-      });
+      await createOrder(newOrder);
+
+      setCompletedOrderTotal(finalTotal);
+      setCompletedItems([...items]);
+      setCompletedPixPayload(generatedPixPayload);
+      window.dispatchEvent(new Event("delivery_orders_updated"));
+      setOrderId(generatedId);
+      setOrderCompleted(true);
+      onClearCart();
+      onRemoveCoupon();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Não foi possível registrar o pedido.";
+      setCheckoutError(message);
+      console.error("Erro ao registrar no banco:", err);
+    } finally {
+      setIsCheckingOut(false);
+    }
   };
 
   const handleResetAndClose = () => {
@@ -495,16 +534,31 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {/* Delivery Address Summary */}
             {currentAddress && currentAddress.rua ? (
-              <div className="p-3.5 bg-orange-50/60 border border-orange-200/80 rounded-2xl">
+              <div
+                className={`p-3.5 rounded-2xl border transition-all ${isOutOfDeliveryRadius
+                  ? "bg-red-50 border-red-200"
+                  : "bg-orange-50/60 border-orange-200/80"
+                  }`}
+              >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-bold text-orange-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-orange-600" />
+                  <span
+                    className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${isOutOfDeliveryRadius ? "text-red-700" : "text-orange-800"
+                      }`}
+                  >
+                    {isOutOfDeliveryRadius ? (
+                      <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+                    ) : (
+                      <MapPin className="w-3.5 h-3.5 text-orange-600" />
+                    )}
                     Entregar em ({currentAddress.label || "Endereço"})
                   </span>
                   <button
                     type="button"
                     onClick={onOpenAddressModal}
-                    className="text-xs font-semibold text-orange-600 hover:text-orange-700 underline cursor-pointer"
+                    className={`text-xs font-semibold underline cursor-pointer ${isOutOfDeliveryRadius
+                      ? "text-red-700 hover:text-red-800 font-bold"
+                      : "text-orange-600 hover:text-orange-700"
+                      }`}
                   >
                     Trocar
                   </button>
@@ -512,7 +566,21 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 <p className="text-xs font-semibold text-slate-800">
                   {currentAddress.rua}, {currentAddress.numero}
                 </p>
-                <p className="text-[11px] text-slate-500">{currentAddress.bairro}</p>
+                <p className="text-[11px] text-slate-500">
+                  {currentAddress.bairro}
+                  {currentAddress.distanciaKm !== undefined && (
+                    <span className="ml-1 text-slate-600 font-medium">
+                      • {currentAddress.distanciaKm} km (OpenStreetMap)
+                    </span>
+                  )}
+                </p>
+
+                {isOutOfDeliveryRadius && (
+                  <div className="mt-2 pt-2 border-t border-red-200 text-xs text-red-700 font-medium flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                    <span>Fora do raio de atendimento (máximo {RAIO_MAXIMO_KM} km). Troque o endereço para continuar.</span>
+                  </div>
+                )}
               </div>
             ) : (
               <div
@@ -764,7 +832,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </div>
 
               <div className="flex items-center justify-between text-slate-500">
-                <span>Taxa de entrega</span>
+                <span className="flex items-center gap-1">
+                  Taxa de entrega
+                  {currentAddress?.distanciaKm !== undefined && (
+                    <span className="text-[10px] text-slate-400">
+                      ({currentAddress.distanciaKm} km via OSM)
+                    </span>
+                  )}
+                </span>
                 <span
                   className={
                     deliveryFee === 0
@@ -795,17 +870,36 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
         {/* Footer with Checkout Button */}
         {!orderCompleted && items.length > 0 && (
-          <div className="p-5 border-t border-slate-100 bg-white">
+          <div className="p-5 border-t border-slate-100 bg-white space-y-2">
+            {storeStatus && !storeStatus.isOpen && (
+              <div className="flex items-start gap-2 p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <p className="text-[11px] font-medium leading-snug">{storeStatus.message}</p>
+              </div>
+            )}
+            {checkoutError && (
+              <p className="text-[11px] text-red-600 font-medium">{checkoutError}</p>
+            )}
             <button
               type="button"
-              disabled={isCheckingOut}
+              disabled={isCheckingOut || isOutOfDeliveryRadius || storeStatus?.isOpen === false}
               onClick={handleCheckout}
-              className="w-full py-3.5 px-4 bg-orange-600 hover:bg-orange-700 active:scale-98 disabled:opacity-75 text-white rounded-xl font-bold text-sm shadow-md shadow-orange-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="w-full py-3.5 px-4 bg-orange-600 hover:bg-orange-700 active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm shadow-md shadow-orange-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               {isCheckingOut ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   <span>Gerando Pedido...</span>
+                </>
+              ) : storeStatus?.isOpen === false ? (
+                <>
+                  <AlertCircle className="w-4 h-4" />
+                  <span>Loja fechada</span>
+                </>
+              ) : isOutOfDeliveryRadius ? (
+                <>
+                  <AlertCircle className="w-4 h-4" />
+                  <span>Fora do Raio de Entrega (Máx. {RAIO_MAXIMO_KM} km)</span>
                 </>
               ) : (
                 <>
@@ -815,7 +909,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               )}
             </button>
             <p className="text-[11px] text-center text-slate-400 mt-2">
-              Gere a comanda para enviar ao WhatsApp
+              {storeStatus?.isOpen === false
+                ? "Pedidos só são aceitos enquanto a loja estiver aberta"
+                : isOutOfDeliveryRadius
+                  ? `Altere o endereço para um local em até ${RAIO_MAXIMO_KM} km`
+                  : "Gere a comanda para enviar ao WhatsApp"}
             </p>
           </div>
         )}

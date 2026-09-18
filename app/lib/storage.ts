@@ -39,6 +39,32 @@ export function saveCustomerProfile(profile: CustomerProfile): void {
   }
 }
 
+export function deleteSavedAddress(id: string): void {
+  if (!isClient) return;
+  try {
+    // 1. Obtém lista atual e filtra removendo o ID enviado
+    const currentList = getSavedAddresses();
+    const updatedList = currentList.filter((addr) => addr.id !== id);
+    
+    // 2. Salva a nova lista no localStorage e dispara evento
+    saveSavedAddresses(updatedList);
+
+    // 3. Se o endereço excluído for o ativo, seleciona o primeiro restante (ou null)
+    const activeAddress = getCurrentAddress();
+    if (activeAddress && activeAddress.id === id) {
+      const nextActive = updatedList.length > 0 ? updatedList[0] : null;
+      if (nextActive) {
+        saveCurrentAddress(nextActive);
+      } else {
+        localStorage.removeItem(KEYS.CURRENT_ADDRESS);
+        dispatchLocalEvent("delivery_current_address_updated");
+      }
+    }
+  } catch (err) {
+    console.error("Erro ao excluir endereço:", err);
+  }
+}
+
 // ----------------- ADDRESSES -----------------
 export function getSavedAddresses(): Address[] {
   if (!isClient) return [];

@@ -76,7 +76,7 @@ export const MyOrdersModal: React.FC<MyOrdersModalProps> = ({
 
   const getWhatsAppLink = (orderId: string) => {
     const text = encodeURIComponent(
-      `Olá! Gostaria de acompanhar o status do meu pedido *#${orderId}* no Manga com Pimenta.`
+      `Olá! Gostaria de acompanhar o status do meu pedido *#${orderId}* no ${process.env.NEXT_PUBLIC_NOME} ${process.env.NEXT_PUBLIC_SOBRENOME}.`
     );
     return `https://wa.me/${process.env.NEXT_PUBLIC_TELEFONE}?text=${text}`;
   };

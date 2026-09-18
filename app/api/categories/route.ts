@@ -2,26 +2,29 @@ import { NextResponse } from "next/server";
 import { initDb } from "@/app/lib/db";
 import { Category } from "@/app/types";
 
+// Função auxiliar para buscar todas as categorias atualizadas do DB
+async function getCategoriesFromDb(db: any): Promise<Category[]> {
+  const result = await db.execute(`
+    SELECT 
+      c.id, 
+      c.name, 
+      c.icon, 
+      (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) as count
+    FROM categories c
+  `);
+
+  return result.rows.map((r: any) => ({
+    id: String(r.id),
+    name: String(r.name),
+    icon: String(r.icon),
+    count: Number(r.count),
+  }));
+}
+
 export async function GET() {
   try {
     const db = await initDb();
-
-    const result = await db.execute(`
-      SELECT 
-        c.id, 
-        c.name, 
-        c.icon, 
-        (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) as count
-      FROM categories c
-    `);
-
-    const categories: Category[] = result.rows.map((r: any) => ({
-      id: String(r.id),
-      name: String(r.name),
-      icon: String(r.icon),
-      count: Number(r.count),
-    }));
-
+    const categories = await getCategoriesFromDb(db);
     return NextResponse.json(categories);
   } catch (error) {
     console.error("Erro ao buscar categorias:", error);
@@ -38,32 +41,42 @@ export async function PUT(request: Request) {
 
     const db = await initDb();
 
-    // Cria as instruções de atualização para executar em lote (batch) no Turso
-    const updateStatements = data.map((cat) => ({
-      sql: "UPDATE categories SET name = ?, icon = ? WHERE id = ?",
-      args: [cat.name.trim(), cat.icon.trim(), cat.id],
+    // 1. Inserir ou atualizar (UPSERT) cada categoria recebida
+    const upsertStatements = data.map((cat) => ({
+      sql: `
+        INSERT INTO categories (id, name, icon) 
+        VALUES (?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET 
+          name = excluded.name, 
+          icon = excluded.icon
+      `,
+      args: [cat.id.trim(), cat.name.trim(), cat.icon.trim()],
     }));
 
-    if (updateStatements.length > 0) {
-      await db.batch(updateStatements, "write");
+    // 2. Apagar categorias do banco que não estão no array enviado
+    const activeIds = data.map((c) => c.id.trim());
+    let deleteStatement: { sql: string; args: any[] } | null = null;
+
+    if (activeIds.length > 0) {
+      const placeholders = activeIds.map(() => "?").join(",");
+      deleteStatement = {
+        sql: `DELETE FROM categories WHERE id NOT IN (${placeholders})`,
+        args: activeIds,
+      };
     }
 
-    const result = await db.execute(`
-      SELECT 
-        c.id, 
-        c.name, 
-        c.icon, 
-        (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) as count
-      FROM categories c
-    `);
+    // 3. Executar todas as operações em lote (batch) no Turso/SQLite
+    const statements = [
+      ...upsertStatements,
+      ...(deleteStatement ? [deleteStatement] : []),
+    ];
 
-    const categories: Category[] = result.rows.map((r: any) => ({
-      id: String(r.id),
-      name: String(r.name),
-      icon: String(r.icon),
-      count: Number(r.count),
-    }));
+    if (statements.length > 0) {
+      await db.batch(statements, "write");
+    }
 
+    // 4. Retornar a lista completa e atualizada
+    const categories = await getCategoriesFromDb(db);
     return NextResponse.json(categories);
   } catch (error) {
     console.error("Erro ao atualizar categorias:", error);
