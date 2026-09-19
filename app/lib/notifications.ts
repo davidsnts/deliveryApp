@@ -42,7 +42,7 @@ export function tocarSomNovoPedido(): void {
       // Nota 1: Aguda (G5 - ~783.99 Hz)
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
-      
+
       osc1.type = "triangle";
       osc1.frequency.setValueAtTime(783.99, startTime);
 
@@ -133,36 +133,120 @@ export async function pedirPermissaoNotificacao(): Promise<"granted" | "denied" 
 /**
  * Dispara uma notificação nativa do navegador para um novo pedido
  */
-export function dispararNotificacaoPedido(order: Order): Notification | null {
-  if (typeof window === "undefined" || !("Notification" in window)) {
+// export function dispararNotificacaoPedido(order: Order): Notification | null {
+//   if (typeof window === "undefined" || !("Notification" in window)) {
+//     return null;
+//   }
+
+//   if (Notification.permission !== "granted") {
+//     return null;
+//   }
+
+//   try {
+//     const orderCode = order.id.replace("PED-", "#");
+//     const totalFormatado = order.total.toFixed(2).replace(".", ",");
+//     const cliente = order.customer?.name || "Cliente";
+//     const itensQtd = order.items?.length || 1;
+
+//     const notificacao = new Notification("🔔 Novo Pedido Recebido!", {
+//       body: `Pedido ${orderCode} - R$ ${totalFormatado}\n${cliente} (${itensQtd} ${itensQtd === 1 ? "item" : "itens"})\nClique para visualizar na comanda.`,
+//       icon: "/favicon.ico",
+//       tag: `pedido-${order.id}`, // Evita duplicatas do mesmo pedido
+//       requireInteraction: true, // Mantém a notificação na tela até o lojista clicar
+//     });
+
+//     notificacao.onclick = () => {
+//       window.focus();
+//       notificacao.close();
+//     };
+
+//     return notificacao;
+//   } catch (err) {
+//     console.warn("Erro ao exibir notificação nativa do navegador:", err);
+//     return null;
+//   }
+// }
+
+// export function dispararNotificacaoPendentes(qtd: number): Notification | null {
+//   if (typeof window === "undefined" || !("Notification" in window)) return null;
+//   if (Notification.permission !== "granted") return null;
+
+//   try {
+//     const n = new Notification("⚠️ Pedidos aguardando!", {
+//       body: `Você tem ${qtd} ${qtd === 1 ? "pedido pendente" : "pedidos pendentes"} sem resposta.`,
+//       icon: "/favicon.ico",
+//       tag: "pedidos-pendentes", // substitui o alerta anterior em vez de empilhar
+//       requireInteraction: true,
+//     });
+//     n.onclick = () => { window.focus(); n.close(); };
+//     return n;
+//   } catch {
+//     return null;
+//   }
+// }
+
+
+export function destravarAudio(): void {
+  getAudioContext();
+}
+
+export async function registrarServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
+  try {
+    return await navigator.serviceWorker.register("/sw.js");
+  } catch (err) {
+    console.warn("Não foi possível registrar o Service Worker:", err);
     return null;
   }
+}
 
-  if (Notification.permission !== "granted") {
-    return null;
+type OpcoesNotificacao = NotificationOptions & { renotify?: boolean; vibrate?: number[] };
+
+async function mostrarNotificacao(titulo: string, opcoes: OpcoesNotificacao): Promise<void> {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+
+  try {
+    const reg = await registrarServiceWorker();
+    if (reg) {
+      await navigator.serviceWorker.ready;
+      await reg.showNotification(titulo, opcoes);
+      return;
+    }
+  } catch (err) {
+    console.warn("Falha ao notificar via Service Worker, usando fallback:", err);
   }
 
   try {
-    const orderCode = order.id.replace("PED-", "#");
-    const totalFormatado = order.total.toFixed(2).replace(".", ",");
-    const cliente = order.customer?.name || "Cliente";
-    const itensQtd = order.items?.length || 1;
-
-    const notificacao = new Notification("🔔 Novo Pedido Recebido!", {
-      body: `Pedido ${orderCode} - R$ ${totalFormatado}\n${cliente} (${itensQtd} ${itensQtd === 1 ? "item" : "itens"})\nClique para visualizar na comanda.`,
-      icon: "/favicon.ico",
-      tag: `pedido-${order.id}`, // Evita duplicatas do mesmo pedido
-      requireInteraction: true, // Mantém a notificação na tela até o lojista clicar
-    });
-
-    notificacao.onclick = () => {
-      window.focus();
-      notificacao.close();
-    };
-
-    return notificacao;
+    const n = new Notification(titulo, opcoes);
+    n.onclick = () => { window.focus(); n.close(); };
   } catch (err) {
     console.warn("Erro ao exibir notificação nativa do navegador:", err);
-    return null;
   }
+}
+
+export function dispararNotificacaoPedido(order: Order): void {
+  const orderCode = order.id.replace("PED-", "#");
+  const totalFormatado = order.total.toFixed(2).replace(".", ",");
+  const cliente = order.customer?.name || "Cliente";
+  const itensQtd = order.items?.length || 1;
+
+  void mostrarNotificacao("🔔 Novo Pedido Recebido!", {
+    body: `Pedido ${orderCode} - R$ ${totalFormatado}\n${cliente} (${itensQtd} ${itensQtd === 1 ? "item" : "itens"})\nClique para visualizar na comanda.`,
+    icon: "/favicon.ico",
+    tag: `pedido-${order.id}`,
+    requireInteraction: true,
+    vibrate: [300, 150, 300],
+  });
+}
+
+export function dispararNotificacaoPendentes(qtd: number): void {
+  void mostrarNotificacao("⚠️ Pedidos aguardando!", {
+    body: `Você tem ${qtd} ${qtd === 1 ? "pedido pendente" : "pedidos pendentes"} sem resposta.`,
+    icon: "/favicon.ico",
+    tag: "pedidos-pendentes",
+    renotify: true,
+    requireInteraction: true,
+    vibrate: [300, 150, 300, 150, 300],
+  });
 }

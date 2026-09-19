@@ -70,8 +70,12 @@ import {
   tocarSomNovoPedido,
   pedirPermissaoNotificacao,
   dispararNotificacaoPedido,
+  dispararNotificacaoPendentes,   // novo
+  registrarServiceWorker,         // novo
+  destravarAudio,                 // novo
   obterStatusPermissaoNotificacao,
 } from "../lib/notifications";
+import { criarTimer } from "../lib/backgroundTimer";   // novo
 import { UsersTab } from "./components/UsersTab";
 import { Users } from "lucide-react";
 
@@ -83,6 +87,7 @@ export default function AdminPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [pendingAlert, setPendingAlert] = useState<{ count: number; oldestMin: number } | null>(null);
 
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryIcon, setNewCategoryIcon] = useState("🍽️");
@@ -195,7 +200,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const intervalId = setInterval(async () => {
+    const stopTimer = criarTimer(async () => {
       try {
         const latestOrders = await fetchOrders();
 
@@ -236,7 +241,79 @@ export default function AdminPage() {
       }
     }, 4000);
 
-    return () => clearInterval(intervalId);
+    return stopTimer;
+  }, [isAuthenticated]);
+  // Lembrete a cada 5 min enquanto houver pedidos pendentes
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const stopTimer = criarTimer(async () => {
+      try {
+        const latest = await fetchOrders(); // busca dados frescos
+        const pendentes = latest.filter((o) => o.status === "pendente");
+
+        setOrders(latest);
+
+        if (pendentes.length === 0) {
+          setPendingAlert(null);
+          return;
+        }
+
+        const maisAntigo = Math.min(...pendentes.map((o) => new Date(o.createdAt).getTime()));
+        setPendingAlert({
+          count: pendentes.length,
+          oldestMin: Math.floor((Date.now() - maisAntigo) / 60000),
+        });
+
+        tocarSomNovoPedido();
+        dispararNotificacaoPendentes(pendentes.length);
+      } catch {
+        // ignora falhas transitórias
+      }
+    }, 5 * 60 * 1000);
+
+    return stopTimer;
+  }, [isAuthenticated]);
+
+  // Registra o Service Worker e destrava o áudio na primeira interação
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    registrarServiceWorker();
+
+    const destravar = () => destravarAudio();
+    window.addEventListener("pointerdown", destravar, { once: true });
+    window.addEventListener("keydown", destravar, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", destravar);
+      window.removeEventListener("keydown", destravar);
+    };
+  }, [isAuthenticated]);
+
+  // Mantém a tela ligada (útil em tablet/celular no balcão)
+  useEffect(() => {
+    if (!isAuthenticated || typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
+
+    let lock: WakeLockSentinel | null = null;
+    let cancelado = false;
+
+    const pedir = async () => {
+      try {
+        lock = await navigator.wakeLock.request("screen");
+        if (cancelado) lock.release().catch(() => { });
+      } catch { }
+    };
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") pedir();
+    };
+
+    pedir();
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => {
+      cancelado = true;
+      document.removeEventListener("visibilitychange", aoVoltar);
+      lock?.release().catch(() => { });
+    };
   }, [isAuthenticated]);
 
   const loadData = async () => {
@@ -809,6 +886,31 @@ export default function AdminPage() {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-orange-600 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <CheckCircle2 className="w-4 h-4" />
           <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {pendingAlert && pendingOrdersCount > 0 && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md bg-amber-500 text-slate-950 rounded-2xl shadow-2xl p-4 flex items-start gap-3">
+          <span className="text-xl">⚠️</span>
+          <div className="flex-1">
+            <p className="text-sm font-black">
+              {pendingOrdersCount} {pendingOrdersCount === 1 ? "pedido pendente" : "pedidos pendentes"}
+            </p>
+            <p className="text-xs font-medium">
+              O mais antigo está esperando há {pendingAlert.oldestMin} min.
+            </p>
+            <button
+              onClick={() => {
+                setActiveTab("orders");
+                setOrderStatusFilter("pendente");
+                setPendingAlert(null);
+              }}
+              className="mt-2 text-xs font-bold bg-slate-950 text-white px-3 py-1.5 rounded-lg"
+            >
+              Ver pedidos
+            </button>
+          </div>
+          <button onClick={() => setPendingAlert(null)} className="text-xs font-bold">✕</button>
         </div>
       )}
 
